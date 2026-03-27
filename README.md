@@ -21,7 +21,7 @@ Docker boilerplate для Laravel с раздельными контейнера
 
 ## Архитектура
 
-Основные dev-сервисы из [docker-compose.yml](/Users/vlavlamat/WorkSpace/php/laravel-labs/laravel-apache-tcp/docker-compose.yml):
+Основные dev-сервисы из **docker-compose.yml**:
 
 - `laravel-php-apache-tcp` - контейнер приложения с PHP-FPM
 - `laravel-apache-tcp` - фронтовый Apache-контейнер
@@ -46,7 +46,7 @@ Docker boilerplate для Laravel с раздельными контейнера
 
 ## Конфигурация
 
-Базовые настройки для разработки находятся в [.env.example](/Users/vlavlamat/WorkSpace/php/laravel-labs/laravel-apache-tcp/.env.example).
+Базовые настройки для разработки находятся в **.env.example**.
 
 Значения по умолчанию для dev:
 
@@ -105,7 +105,7 @@ docker compose -f docker-compose.yml exec laravel-node-apache-tcp npm install
 
 ## Основные команды Makefile
 
-Ключевые команды из [Makefile](/Users/vlavlamat/WorkSpace/php/laravel-labs/laravel-apache-tcp/Makefile):
+Ключевые команды из **Makefile**:
 
 ```bash
 make help
@@ -154,7 +154,7 @@ make npm-build
 
 ## Как настроено TCP-подключение
 
-Конфиг Apache: [docker/httpd/conf/httpd.conf](/Users/vlavlamat/WorkSpace/php/laravel-labs/laravel-apache-tcp/docker/httpd/conf/httpd.conf)
+Конфиг Apache: **docker/httpd/conf/httpd.conf**
 
 ```apache
 <FilesMatch \.php$>
@@ -162,7 +162,7 @@ make npm-build
 </FilesMatch>
 ```
 
-Конфиг PHP-FPM: [docker/php/www.conf](/Users/vlavlamat/WorkSpace/php/laravel-labs/laravel-apache-tcp/docker/php/www.conf)
+Конфиг PHP-FPM: **docker/php/www.conf**
 
 ```ini
 listen = 9000
@@ -184,9 +184,9 @@ Healthcheck PHP-FPM тоже идет по TCP через FastCGI ping, поэт
 
 Конфигурация production разделена между файлами:
 
-- [docker-compose.prod.yml](/Users/vlavlamat/WorkSpace/php/laravel-labs/laravel-apache-tcp/docker-compose.prod.yml)
-- [docker-compose.prod.local.yml](/Users/vlavlamat/WorkSpace/php/laravel-labs/laravel-apache-tcp/docker-compose.prod.local.yml)
-- [.env.production.example](/Users/vlavlamat/WorkSpace/php/laravel-labs/laravel-apache-tcp/.env.production.example)
+- **docker-compose.prod.yml** — для запуска на production-сервере
+- **docker-compose.prod.local.yml** — для локального запуска production-профиля, smoke test
+- **.env.production.example** — необходлимые переменные для локального запуска production-профиля
 
 Локальный запуск production-профиля:
 
