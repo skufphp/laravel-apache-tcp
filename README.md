@@ -1,240 +1,206 @@
-# Laravel + Apache + PHP-FPM по TCP
+# Laravel Apache TCP Lab
 
-Docker boilerplate для Laravel с раздельными контейнерами `httpd` и `php-fpm`.
+Тестовый проект для проверки сборки и запуска Laravel на базе связки Apache (Httpd) + PHP-FPM через TCP.
 
-Этот проект почти полностью повторяет вариант с `unix socket`, но здесь Apache подключается к PHP-FPM по TCP внутри Docker-сети:
+Репозиторий используется как лабораторный стенд для Laravel-приложения, собранного на связке:
 
-- Apache проксирует PHP-запросы на `laravel-php-apache-tcp:9000`
-- PHP-FPM слушает порт `9000` через `listen = 9000`
-- общий Unix socket между контейнерами не используется
+- PHP-FPM + Apache (Httpd) через TCP
+- PostgreSQL
+- Redis
+- Node.js / Vite
+- Docker Compose для локальной разработки, локального production-like запуска и server-side production compose
 
-## Стек
+Отдельно проект подготовлен так, чтобы его было удобно использовать для деплоя через Dokploy: production-конфигурация уже вынесена в отдельные compose-файлы и ориентирована на контейнерный запуск.
 
-- Laravel 13
-- PHP 8.5 FPM (Alpine)
-- Apache Httpd 2.4 (Alpine)
-- PostgreSQL 18.2
-- Redis 8.6
-- Node 24 + Vite
-- pgAdmin 4 для разработки
-- отдельные контейнеры для queue worker и scheduler
+## Что здесь проверяется
 
-## Архитектура
+- Сборка Laravel-приложения с использованием Apache в качестве веб-сервера
+- Работа Apache и PHP-FPM через TCP внутри Docker-сети
+- Dev-режим с примонтированным кодом, Vite и Xdebug
+- Production-сборка с multi-stage Dockerfile (`php.Dockerfile` и `httpd.Dockerfile`)
+- Запуск очередей и scheduler в отдельных контейнерах
+- Отдельные production compose-файлы для локальной проверки и серверного деплоя
+- Готовность проекта к деплою через Docker Compose / Dokploy
 
-Основные dev-сервисы из **docker-compose.yml**:
+## Архитектура проекта
 
-- `laravel-php-apache-tcp` - контейнер приложения с PHP-FPM
-- `laravel-apache-tcp` - фронтовый Apache-контейнер
-- `laravel-node-apache-tcp` - Vite dev server
-- `laravel-postgres-apache-tcp` - PostgreSQL
-- `laravel-redis-apache-tcp` - Redis
-- `laravel-queue-apache-tcp` - Laravel queue worker
-- `laravel-scheduler-apache-tcp` - Laravel scheduler
-- `laravel-pgadmin-apache-tcp` - pgAdmin
+- **Apache (Httpd)** проксирует запросы в **PHP-FPM** через TCP (`laravel-php-apache-tcp:9000`)
+- **PostgreSQL** используется как основная БД
+- **Redis** используется для кеша, сессий и очередей
+- **Node-контейнер** отвечает за frontend-сборку и Vite HMR в режиме разработки
+- **Production-сборка** выполняется через multi-stage Dockerfile для PHP и Apache
 
-Схема запроса:
+## Структура
 
-1. Браузер обращается к Apache на хостовом порту `HTTPD_PORT`
-2. Apache отдает статику из `public/`
-3. PHP-запросы уходят через `mod_proxy_fcgi` на `laravel-php-apache-tcp:9000`
-4. Laravel подключается к PostgreSQL и Redis по именам контейнеров внутри bridge-сети Docker
+- `docker/` - Dockerfiles и конфигурация PHP / Apache (Httpd)
+- `docker-compose.yml` - окружение для разработки
+- `docker-compose.prod.local.yml` - локальный запуск production-профиля с публикацией `HTTPD_PORT`
+- `docker-compose.prod.yml` - production-конфигурация для серверного деплоя без проброса локальных портов
+- `Makefile` - основные команды для разработки и обслуживания
+- `.env.example` - шаблон переменных для dev
+- `.env.production.example` - шаблон переменных для production
 
-Ключевое отличие от версии с Unix socket:
+## Быстрый старт для разработки
 
-- вместо `unix:/path/to/php-fpm.sock|fcgi://...`
-- используется `proxy:fcgi://laravel-php-apache-tcp:9000`
-
-## Конфигурация
-
-Базовые настройки для разработки находятся в **.env.example**.
-
-Значения по умолчанию для dev:
-
-- приложение: `http://localhost:8050`
-- Vite HMR: `http://localhost:5173`
-- pgAdmin: `http://localhost:8080`
-- PostgreSQL: `localhost:5432`
-- Redis: `localhost:6379`
-
-Ключевые переменные окружения:
-
-- `HTTPD_PORT=8050`
-- `DB_HOST=laravel-postgres-apache-tcp`
-- `DB_PORT=5432`
-- `REDIS_HOST=laravel-redis-apache-tcp`
-- `REDIS_PORT=6379`
-- `XDEBUG_MODE=off`
-- `XDEBUG_CLIENT_HOST=host.docker.internal`
-
-## Быстрый старт
-
-### Вариант 1. Полная инициализация через Makefile
+1. Скопируйте переменные окружения:
 
 ```bash
 cp .env.example .env
+```
+
+2. Заполните `.env` реальными значениями.
+
+Минимально проверьте:
+
+- `APP_*`
+- `DB_*`
+- `REDIS_*`
+- `HTTPD_PORT` (порт, на котором будет доступен сайт)
+- `DB_FORWARD_PORT`
+- `REDIS_FORWARD_PORT`
+- `PGADMIN_PORT`
+- `XDEBUG_*` при необходимости
+
+3. Запустите инициализацию проекта:
+
+```bash
 make setup
 ```
 
-Что делает `make setup`:
+Команда:
 
-- собирает образы
-- поднимает контейнеры
-- ждет готовности PostgreSQL и Redis
-- ставит Composer- и NPM-зависимости
-- генерирует `APP_KEY`
-- запускает миграции
-- исправляет права на `storage` и `bootstrap/cache`
-- удаляет `public/.htaccess`, так как роутинг уже настроен напрямую в конфиге Apache
+- соберет dev-образы
+- поднимет контейнеры
+- дождется готовности PostgreSQL и Redis
+- установит Composer и NPM зависимости
+- сгенерирует `APP_KEY`
+- выполнит миграции
+- выставит права на `storage/` и `bootstrap/cache`
+- удалит `public/.htaccess` (не используется, так как конфигурация Apache встроена в образ)
 
 После запуска будут доступны:
 
-- `http://localhost:8050`
-- `http://localhost:8080` для pgAdmin
+- Laravel: `http://localhost:8050` по умолчанию (порт берется из `HTTPD_PORT`)
+- Vite dev server: `http://localhost:5173`
+- pgAdmin: `http://localhost:8080` по умолчанию (порт берется из `PGADMIN_PORT`)
 
-### Вариант 2. Ручной запуск
-
-```bash
-cp .env.example .env
-docker compose -f docker-compose.yml build
-docker compose -f docker-compose.yml up -d
-docker compose -f docker-compose.yml exec laravel-php-apache-tcp composer install
-docker compose -f docker-compose.yml exec laravel-php-apache-tcp php artisan key:generate
-docker compose -f docker-compose.yml exec laravel-php-apache-tcp php artisan migrate
-docker compose -f docker-compose.yml exec laravel-node-apache-tcp npm install
-```
-
-## Основные команды Makefile
-
-Ключевые команды из **Makefile**:
+Если нужна ручная последовательность, используйте:
 
 ```bash
-make help
-make setup
-make up
-make down
 make build
-make rebuild
-make status
-make logs
-make validate
+make up
+make install-deps
+make artisan CMD="key:generate"
+make migrate
+make cleanup-httpd
 ```
 
-Полезные команды для сервисов:
+## Основные команды
+
+### Development
+
+```bash
+make up           # Запустить контейнеры (Dev)
+make down         # Остановить контейнеры
+make restart      # Перезапустить контейнеры
+make build        # Собрать образы
+make rebuild      # Пересобрать образы без кэша
+make logs         # Показать логи всех сервисов
+make logs-php     # Логи PHP-FPM
+make logs-httpd   # Логи Apache
+make status       # Статус контейнеров
+make info         # Информация о портах и сервисах
+```
+
+### Laravel / PHP / Node
+
+```bash
+make artisan CMD="migrate"
+make composer CMD="install"
+make migrate
+make rollback
+make fresh        # Пересоздать базу и запустить сиды
+make tinker
+make test-php     # Запустить тесты (PHPUnit)
+make npm-install
+make npm-build    # Собрать фронтенд
+```
+
+### Shell и CLI-доступ
 
 ```bash
 make shell-php
 make shell-httpd
-make shell-postgres
-make shell-redis
-make logs-php
-make logs-httpd
-make logs-postgres
-make logs-redis
+make shell-node
+make shell-postgres   # Вход в psql
+make shell-redis      # Проверка связи с Redis
 ```
 
-Команды Laravel:
+### Production / Production-like
 
 ```bash
-make artisan CMD="migrate"
-make migrate
-make rollback
-make fresh
-make tinker
-make test-php
-make test-coverage
+make up-prod          # Запуск локального prod-окружения
+make down-prod        # Остановка prod-окружения
+make rebuild-prod     # Пересборка prod-образов
+make logs-prod        # Логи всех prod-сервисов
+make shell-php-prod   # Shell в prod PHP контейнере
 ```
 
-Команды фронтенда:
+## Production-like локальный запуск
 
-```bash
-make npm-install
-make npm-dev
-make npm-build
-```
+Для локальной проверки production-сценария:
 
-## Как настроено TCP-подключение
-
-Конфиг Apache: **docker/httpd/conf/httpd.conf**
-
-```apache
-<FilesMatch \.php$>
-    SetHandler "proxy:fcgi://laravel-php-apache-tcp:9000"
-</FilesMatch>
-```
-
-Конфиг PHP-FPM: **docker/php/www.conf**
-
-```ini
-listen = 9000
-ping.path = /ping
-ping.response = pong
-```
-
-Healthcheck PHP-FPM тоже идет по TCP через FastCGI ping, поэтому готовность контейнера проверяется не формально, а по реальному слушателю FPM на порту `9000`.
-
-## Особенности разработки
-
-- код приложения монтируется с хоста в PHP-, Apache- и Node-контейнеры
-- Vite работает в отдельном Node-контейнере на порту `5173`
-- в dev-образ PHP встроена поддержка Xdebug
-- `clear_env = no` в FPM позволяет пробрасывать переменные контейнера внутрь PHP и Laravel
-- сессии, кеш и очереди по умолчанию работают через Redis
-
-## Production-режим
-
-Конфигурация production разделена между файлами:
-
-- **docker-compose.prod.yml** — для запуска на production-сервере
-- **docker-compose.prod.local.yml** — для локального запуска production-профиля, smoke test
-- **.env.production.example** — необходлимые переменные для локального запуска production-профиля
-
-Локальный запуск production-профиля:
+1. Скопируйте шаблон:
 
 ```bash
 cp .env.production.example .env.production
+```
+
+2. Заполните `.env.production`.
+
+3. Запустите production-профиль:
+
+```bash
 make up-prod
 ```
 
-Что важно в production:
+Этот target использует:
 
-- PHP- и Apache-образы собираются как отдельные multi-stage production images
-- frontend-ассеты собираются на этапе build
-- PHP-контейнер при старте выполняет `php artisan migrate --force`
-- queue worker и scheduler работают как отдельные long-running сервисы
-- в local production режиме наружу публикуется только порт Apache
+- `.env.production`
+- `docker-compose.prod.local.yml`
+- production stage из `docker/php.Dockerfile` и `docker/httpd.Dockerfile`
 
-## Порты по умолчанию
+В production-профиле:
 
-- `8050` -> Apache
-- `5173` -> Vite dev server
-- `5432` -> PostgreSQL
-- `6379` -> Redis
-- `8080` -> pgAdmin
-- `9000` -> внутренний TCP-порт PHP-FPM внутри Docker-сети
+- используется production stage образов
+- Laravel собирается без dev-зависимостей
+- frontend-ассеты собираются на этапе сборки образа
+- миграции выполняются автоматически при старте PHP-контейнера
+- выполняется `php artisan optimize:clear`
+- queue worker и scheduler вынесены в отдельные сервисы
+- локально публикуется только порт Apache, заданный через `HTTPD_PORT`
 
-## Проверка работы
+## Dokploy
 
-Проверить состояние контейнеров:
+Проект полностью готов для деплоя через Dokploy как Docker Compose приложение.
 
-```bash
-make status
-```
+- Используйте `docker-compose.prod.yml` для конфигурации в Dokploy.
+- Переменные окружения задаются через интерфейс Dokploy или `.env.production`.
+- Весь стек (Apache, PHP, DB, Redis, Worker, Scheduler) разделен по сервисам.
+- Внешний роутинг Dokploy должен быть направлен на сервис `laravel-apache-tcp` на порт 80.
 
-Проверить HTTP-доступность сервисов:
+## Стек
 
-```bash
-make validate
-```
+- Laravel 13+
+- PHP 8.5 FPM (Alpine)
+- Apache (Httpd) 2.4 (Alpine)
+- PostgreSQL 18.2 (Alpine)
+- Redis 8.6 (Alpine)
+- Node.js 24 (Alpine)
 
-Если что-то не работает, посмотреть логи:
+## Примечания
 
-```bash
-make logs
-make logs-php
-make logs-httpd
-```
-
-## Примечание
-
-- это не общий гайд по Laravel, а документация именно к этому Docker boilerplate
-- основная цель проекта - показать связку Laravel + Apache + PHP-FPM через TCP вместо Unix socket
+- Dev-окружение использует bind mount проекта для удобства разработки.
+- Взаимодействие Apache и PHP-FPM происходит через TCP внутри Docker-сети вместо Unix Domain Socket.
+- В dev-режиме доступен `pgAdmin` для управления БД.
+- Production-конфигурация ориентирована на создание неизменяемых (immutable) контейнеров.
