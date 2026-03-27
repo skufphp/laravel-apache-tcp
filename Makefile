@@ -23,7 +23,7 @@ NC=\033[0m
 
 # Переменные Compose
 COMPOSE = docker compose -f docker-compose.yml
-COMPOSE_PROD = docker compose -f docker-compose.prod.yml -f docker-compose.prod.local.yml
+COMPOSE_PROD = docker compose --env-file .env.production -f docker-compose.prod.local.yml
 
 HTTPD_PORT := $(shell grep '^HTTPD_PORT=' .env 2>/dev/null | cut -d '=' -f 2- | tr -d '[:space:]')
 ifeq ($(HTTPD_PORT),)
